@@ -70,28 +70,28 @@ class Lock {
 
 class LockManager {
     HashMap<Object, Lock> lockTable;
-    HashMap<TransactionId, ArrayList<PageId>> transactionTable;
+    HashMap<TransactionId, ArrayList<Object>> transactionTable;
 
     public LockManager() {
         lockTable = new HashMap<Object, Lock>();
-        transactionTable = new HashMap<TransactionId, ArrayList<PageId>>();
+        transactionTable = new HashMap<TransactionId, ArrayList<Object>>();
     }
 
-    private void updateTransactionTable(TransactionId tid, PageId pid) {
+    private void updateTransactionTable(TransactionId tid, Object obj) {
         if (!transactionTable.containsKey(tid)) {
-            ArrayList<PageId> pages = new ArrayList<PageId>();
-            pages.add(pid);
-            transactionTable.put(tid, pages);
+            ArrayList<Object> objs = new ArrayList<Object>();
+            objs.add(obj);
+            transactionTable.put(tid, objs);
         } else {
-            ArrayList<PageId> pages = transactionTable.get(tid);
-            if (!pages.contains(pid)) {
-                pages.add(pid);
+            ArrayList<Object> objs = transactionTable.get(tid);
+            if (!objs.contains(obj)) {
+                objs.add(obj);
             }
         }
     }
 
-    private ArrayList<PageId> getTransactionPages(TransactionId tid) {
-        return transactionTable.getOrDefault(tid, new ArrayList<PageId>());
+    public ArrayList<Object> getTransactionObjects(TransactionId tid) {
+        return transactionTable.getOrDefault(tid, new ArrayList<Object>());
     }
 
     private void waitFor() {
@@ -108,12 +108,14 @@ class LockManager {
                 Lock lock = new Lock(obj, type);
                 lock.acquire(tid);
                 lockTable.put(obj, lock);
+                updateTransactionTable(tid, obj);
                 return;
             }
             Lock lock = lockTable.get(obj);
             if (lock.getType() == LockType.SHARED) {
                 if (type == LockType.SHARED) {
                     lock.acquire(tid);
+                    updateTransactionTable(tid, obj);
                     return;
                 } else {
                     if (lock.getHolderSize() == 1 && lock.isHolder(tid)) {
@@ -325,9 +327,10 @@ public class BufferPool {
      *     break simpledb if running in NO STEAL mode.
      */
     public synchronized void flushAllPages() throws IOException {
-        // some code goes here
-        // not necessary for lab1
-
+        Enumeration<PageId> e = pages.keys();
+        while (e.hasMoreElements()) {
+            flushPage(e.nextElement());
+        }
     }
 
     /** Remove the specific page id from the buffer pool.
@@ -358,6 +361,10 @@ public class BufferPool {
     /** Write all pages of the specified transaction to disk.
      */
     public synchronized  void flushPages(TransactionId tid) throws IOException {
+        ArrayList<Object> pages = lockManager.getTransactionObjects(tid);
+        for (Object pid : pages) {
+            flushPage((PageId)pid);
+        }
     }
 
     /**
@@ -380,5 +387,4 @@ public class BufferPool {
             return;
         }
     }
-
 }
