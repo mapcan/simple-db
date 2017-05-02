@@ -72,7 +72,7 @@ class Lock {
 class LockManager {
     HashMap<Object, Lock> lockTable;
     HashMap<TransactionId, ArrayList<Object>> transactionTable;
-    public static final int DEADLOCKTIMEOUT = 2000;
+    public static final int DEADLOCKTIMEOUT = 5000;
 
     public LockManager() {
         lockTable = new HashMap<Object, Lock>();
@@ -111,10 +111,10 @@ class LockManager {
     }
 
     public synchronized void acquireLock(Object obj, TransactionId tid, LockType type, int timeout) 
-        throws TransactionAbortedException, DbException {
+        throws TransactionAbortedException {
         long start = System.currentTimeMillis();
         Random rand = new Random();
-        long randomTimeout = rand.nextInt((timeout - 0) + 1) + 0;
+        long randomTimeout = rand.nextInt(timeout + 1);
         while (true) {
             if (!lockTable.containsKey(obj)) {
                 Lock lock = new Lock(obj, type);
@@ -138,10 +138,6 @@ class LockManager {
                     }
                 }
             } else {
-                int a = 0;
-                if (a == 0) {
-                throw new DbException(tid + " " + obj);
-                }
                 if (lock.isHolder(tid)) {
                     return;
                 }
