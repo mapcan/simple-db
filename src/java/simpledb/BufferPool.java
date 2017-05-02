@@ -3,6 +3,7 @@ package simpledb;
 import java.io.*;
 
 import java.util.Queue;
+import java.util.Random;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -71,6 +72,7 @@ class Lock {
 class LockManager {
     HashMap<Object, Lock> lockTable;
     HashMap<TransactionId, ArrayList<Object>> transactionTable;
+    public static final int DEADLOCKTIMEOUT = 2000;
 
     public LockManager() {
         lockTable = new HashMap<Object, Lock>();
@@ -94,15 +96,25 @@ class LockManager {
         return transactionTable.getOrDefault(tid, new ArrayList<Object>());
     }
 
-    private void waitFor() {
+    private void waitFor(long startTime, long timeout) throws TransactionAbortedException {
+        if (System.currentTimeMillis() - startTime > timeout) {
+            throw new TransactionAbortedException();
+        }
         try {
-            wait();
+            wait(timeout);
+            if (System.currentTimeMillis() - startTime > timeout) {
+                throw new TransactionAbortedException();
+            }
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
     }
 
-    public synchronized void acquireLock(Object obj, TransactionId tid, LockType type) {
+    public synchronized void acquireLock(Object obj, TransactionId tid, LockType type, int timeout) 
+        throws TransactionAbortedException, DbException {
+        long start = System.currentTimeMillis();
+        Random rand = new Random();
+        long randomTimeout = rand.nextInt((timeout - 0) + 1) + 0;
         while (true) {
             if (!lockTable.containsKey(obj)) {
                 Lock lock = new Lock(obj, type);
@@ -122,14 +134,18 @@ class LockManager {
                         lock.upgrade(tid);
                         return;
                     } else {
-                        waitFor();
+                        waitFor(start, randomTimeout);
                     }
                 }
             } else {
+                int a = 0;
+                if (a == 0) {
+                throw new DbException(tid + " " + obj);
+                }
                 if (lock.isHolder(tid)) {
                     return;
                 }
-                waitFor();
+                waitFor(start, randomTimeout);
             }
         }
     }
@@ -230,7 +246,7 @@ public class BufferPool {
         } else {
             lockType = LockType.EXCLUSIVE;
         }
-        lockManager.acquireLock(pid, tid, lockType);
+        lockManager.acquireLock(pid, tid, lockType, LockManager.DEADLOCKTIMEOUT);
         Page page = pages.get(pid);
         if (page != null) {
             return page;
@@ -408,5 +424,6 @@ public class BufferPool {
             discardPage(pid);
             return;
         }
+        throw new DbException("all pages are dirty");
     }
 }
