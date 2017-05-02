@@ -9,6 +9,151 @@ import java.util.LinkedList;
 import java.util.Enumeration;
 import java.util.concurrent.ConcurrentHashMap;
 
+enum LockType {
+    SHARED,
+    EXCLUSIVE
+}
+
+class Lock {
+    Object obj;
+    LockType type;
+    ArrayList<TransactionId> holders;
+
+    public Lock(Object obj, LockType type) {
+        this.obj = obj;
+        this.type = type;
+        this.holders = new ArrayList<TransactionId>();
+    }
+
+    public LockType getType() {
+        return type;
+    }
+
+    public void setType(LockType type) {
+        this.type = type;
+    }
+
+    public int getHolderSize() {
+        return holders.size();
+    }
+
+    public void acquire(TransactionId tid) {
+        if (type == LockType.SHARED && !holders.contains(tid)) {
+            holders.add(tid);
+        } else if (type == LockType.EXCLUSIVE && holders.size() <= 1 && !holders.contains(tid)) {
+            holders.add(tid);
+        }
+    }
+
+    public void release(TransactionId tid) {
+        holders.remove(tid);
+    }
+
+    public boolean isHolder(TransactionId tid) {
+        return holders.contains(tid);
+    }
+
+    public boolean upgrade(TransactionId tid) {
+        if (type != LockType.SHARED) {
+            return false;
+        }
+        if (holders.size() != 1) {
+            return false;
+        }
+        if (holders.get(0) != tid) {
+            return false;
+        }
+        setType(LockType.EXCLUSIVE);
+        return true;
+    }
+}
+
+class LockManager {
+    HashMap<Object, Lock> lockTable;
+    HashMap<TransactionId, ArrayList<PageId>> transactionTable;
+
+    public LockManager() {
+        lockTable = new HashMap<Object, Lock>();
+        transactionTable = new HashMap<TransactionId, ArrayList<PageId>>();
+    }
+
+    private void updateTransactionTable(TransactionId tid, PageId pid) {
+        if (!transactionTable.containsKey(tid)) {
+            ArrayList<PageId> pages = new ArrayList<PageId>();
+            pages.add(pid);
+            transactionTable.put(tid, pages);
+        } else {
+            ArrayList<PageId> pages = transactionTable.get(tid);
+            if (!pages.contains(pid)) {
+                pages.add(pid);
+            }
+        }
+    }
+
+    private ArrayList<PageId> getTransactionPages(TransactionId tid) {
+        return transactionTable.getOrDefault(tid, new ArrayList<PageId>());
+    }
+
+    private void waitFor() {
+        try {
+            wait();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public synchronized void acquireLock(Object obj, TransactionId tid, LockType type) {
+        while (true) {
+            if (!lockTable.containsKey(obj)) {
+                Lock lock = new Lock(obj, type);
+                lock.acquire(tid);
+                lockTable.put(obj, lock);
+                return;
+            }
+            Lock lock = lockTable.get(obj);
+            if (lock.getType() == LockType.SHARED) {
+                if (type == LockType.SHARED) {
+                    lock.acquire(tid);
+                    return;
+                } else {
+                    if (lock.getHolderSize() == 1 && lock.isHolder(tid)) {
+                        lock.upgrade(tid);
+                        return;
+                    } else {
+                        waitFor();
+                    }
+                }
+            } else {
+                if (lock.isHolder(tid)) {
+                    return;
+                }
+                waitFor();
+            }
+        }
+    }
+
+    public synchronized void releaseLock(Object obj, TransactionId tid) {
+        if (!lockTable.containsKey(obj)) {
+            return;
+        }
+        Lock lock = lockTable.get(obj);
+        lock.release(tid);
+        if (!(lock.getHolderSize() == 0)) {
+            return;
+        }
+        lockTable.remove(obj);
+        notifyAll();
+    }
+
+    public synchronized boolean holdsLock(Object obj, TransactionId tid) {
+        if (!lockTable.containsKey(obj)) {
+            return false;
+        }
+        Lock lock = lockTable.get(obj);
+        return lock.isHolder(tid);
+    }
+}
+
 /**
  * BufferPool manages the reading and writing of pages into memory from
  * disk. Access methods call into it to retrieve pages, and it fetches
@@ -34,6 +179,8 @@ public class BufferPool {
     //private LinkedList<PageId> pgl;
     private ConcurrentHashMap<PageId, Page> pages;
 
+    private LockManager lockManager;
+
     /**
      * Creates a BufferPool that caches up to numPages pages.
      *
@@ -43,6 +190,7 @@ public class BufferPool {
         this.numPages = numPages;
         //this.pgl = new LinkedList<PageId>();
         this.pages = new ConcurrentHashMap<PageId, Page>();
+        this.lockManager = new LockManager();
     }
     
     public static int getPageSize() {
@@ -64,22 +212,15 @@ public class BufferPool {
      * @param pid the ID of the requested page
      * @param perm the requested permissions on the page
      */
-    //public Page getPage(TransactionId tid, PageId pid, Permissions perm)
-    //    throws TransactionAbortedException, DbException {
-    //    if (pages.size() > numPages) {
-    //        throw new DbException("BufferPool full");
-    //    }
-    //    Page page = pages.get(pid);
-    //    if (page != null) {
-    //        return page;
-    //    }
-    //    page = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
-    //    pages.put(pid, page);
-    //    return page;
-    //}
-
     public Page getPage(TransactionId tid, PageId pid, Permissions perm)
         throws TransactionAbortedException, DbException {
+        LockType lockType;
+        if (perm == Permissions.READ_ONLY) {
+            lockType = LockType.SHARED;
+        } else {
+            lockType = LockType.EXCLUSIVE;
+        }
+        lockManager.acquireLock(pid, tid, lockType);
         Page page = pages.get(pid);
         if (page != null) {
             return page;
@@ -102,8 +243,7 @@ public class BufferPool {
      * @param pid the ID of the page to unlock
      */
     public  void releasePage(TransactionId tid, PageId pid) {
-        // some code goes here
-        // not necessary for lab1|lab2
+        lockManager.releaseLock(pid, tid);
     }
 
     /**
@@ -118,9 +258,7 @@ public class BufferPool {
 
     /** Return true if the specified transaction has a lock on the specified page */
     public boolean holdsLock(TransactionId tid, PageId p) {
-        // some code goes here
-        // not necessary for lab1|lab2
-        return false;
+        return lockManager.holdsLock(p, tid);
     }
 
     /**
@@ -214,13 +352,12 @@ public class BufferPool {
             return;
         }
         Database.getCatalog().getDatabaseFile(page.getId().getTableId()).writePage(page);
+        page.markDirty(false, null);
     }
 
     /** Write all pages of the specified transaction to disk.
      */
     public synchronized  void flushPages(TransactionId tid) throws IOException {
-        // some code goes here
-        // not necessary for lab1|lab2
     }
 
     /**
@@ -232,19 +369,15 @@ public class BufferPool {
         Enumeration<PageId> e = pages.keys();
         while (e.hasMoreElements()) {
             pid = e.nextElement();
-            break;
-        }
-        if (pid == null) {
-            return;
-        }
-        Page page = pages.remove(pid);
-        if (page.isDirty() != null) {
-            try {
-                flushPage(page.getId());
-                discardPage(page.getId());
-            } catch (IOException err) {
-                throw new DbException("evict page error: " + err);
+            if (pid == null) {
+                continue;
             }
+            Page page = pages.get(pid);
+            if (page.isDirty() != null) {
+                continue;
+            }
+            discardPage(pid);
+            return;
         }
     }
 
