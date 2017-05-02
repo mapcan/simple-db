@@ -135,6 +135,14 @@ class LockManager {
     }
 
     public synchronized void releaseLock(Object obj, TransactionId tid) {
+        if (!transactionTable.containsKey(tid)) {
+            return;
+        }
+        ArrayList<Object> objects = transactionTable.get(tid);
+        if (!objects.contains(obj)) {
+            return;
+        }
+        objects.remove(obj);
         if (!lockTable.containsKey(obj)) {
             return;
         }
@@ -254,8 +262,7 @@ public class BufferPool {
      * @param tid the ID of the transaction requesting the unlock
      */
     public void transactionComplete(TransactionId tid) throws IOException {
-        // some code goes here
-        // not necessary for lab1|lab2
+        transactionComplete(tid, true);
     }
 
     /** Return true if the specified transaction has a lock on the specified page */
@@ -272,8 +279,22 @@ public class BufferPool {
      */
     public void transactionComplete(TransactionId tid, boolean commit)
         throws IOException {
-        // some code goes here
-        // not necessary for lab1|lab2
+        ArrayList<Object> pids = new ArrayList<Object>(lockManager.getTransactionObjects(tid));
+        if (commit) {
+            flushPages(tid);
+        } else {
+            for (Object pid : pids) {
+                if (pages.containsKey(pid)) {
+                    Page page = pages.get(pid);
+                    if (page.isDirty() != null) {
+                        discardPage((PageId)pid);
+                    }
+                }
+            }
+        }
+        for (Object pid : pids) {
+            releasePage(tid, (PageId)pid);
+        }
     }
 
     /**
@@ -296,6 +317,7 @@ public class BufferPool {
         ArrayList<Page> modified = file.insertTuple(tid, t);
         for (Page p : modified) {
             p.markDirty(true, tid);
+            pages.remove(p.getId());
             pages.put(p.getId(), p);
         }
     }

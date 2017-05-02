@@ -64,11 +64,12 @@ public class Insert extends Operator {
             return null;
         }
 
-        DbFile file = Database.getCatalog().getDatabaseFile(tableid);
+        //DbFile file = Database.getCatalog().getDatabaseFile(tableid);
         int inserted = 0;
         while (child.hasNext()) {
             try {
-                file.insertTuple(tid, child.next());
+                //file.insertTuple(tid, child.next());
+                Database.getBufferPool().insertTuple(tid, tableid, child.next());
                 inserted += 1;
             } catch (IOException e) {
                 throw new DbException("Insert error: " + e);
