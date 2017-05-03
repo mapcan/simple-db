@@ -22,6 +22,10 @@ public class Filter extends Operator {
         this.td = child.getTupleDesc();
     }
 
+    public Predicate getPredicate() {
+        return p;
+    }
+
     public TupleDesc getTupleDesc() {
         return td;
     }
@@ -57,5 +61,13 @@ public class Filter extends Operator {
             }
         }
         return null;
+    }
+
+    public DbIterator[] getChildren() {
+        return new DbIterator[]{child};
+    }
+
+    public void setChildren(DbIterator[] children) {
+        this.child = children[0];
     }
 }

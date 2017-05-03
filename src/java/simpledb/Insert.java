@@ -81,4 +81,12 @@ public class Insert extends Operator {
         fetched = true;
         return t;
     }
+
+    public DbIterator[] getChildren() {
+        return new DbIterator[]{child};
+    }
+
+    public void setChildren(DbIterator[] children) {
+        this.child = children[0];
+    }
 }

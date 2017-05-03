@@ -29,6 +29,18 @@ public class JoinPredicate {
         return op;
     }
 
+    public int getField1() {
+        return field1;
+    }
+
+    public int getField2() {
+        return field2;
+    }
+
+    public Predicate.Op getOperator() {
+        return op;
+    }
+
     /**
      * Apply the predicate to the two specified tuples.
      * The comparison can be made through Field's compare method.

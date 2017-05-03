@@ -30,6 +30,10 @@ public class OrderBy extends Operator {
         return td;
     }
 
+    public int getOrderByField() {
+        return orderByField;
+    }
+
     public void open()
         throws DbException, NoSuchElementException, TransactionAbortedException {
         child.open();
@@ -61,6 +65,14 @@ public class OrderBy extends Operator {
         } else
             return null;
     }
+
+    public DbIterator[] getChildren() {
+        return new DbIterator[]{child};
+    }
+
+    public void setChildren(DbIterator[] children) {
+        this.child = children[0];
+    }
 }
 
  class TupleComparator implements Comparator<Tuple> {
@@ -82,5 +94,4 @@ public class OrderBy extends Operator {
          else
              return asc?-1:1;
      }
-
 }

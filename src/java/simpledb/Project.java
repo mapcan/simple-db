@@ -65,4 +65,12 @@ public class Project extends Operator {
         }
         return null;
     }
+
+    public DbIterator[] getChildren() {
+        return new DbIterator[]{child};
+    }
+
+    public void setChildren(DbIterator[] children) {
+        this.child = children[0];
+    }
 }

@@ -10,14 +10,19 @@ public class LogicalSubplanJoinNode extends LogicalJoinNode {
     DbIterator subPlan;
     
     public LogicalSubplanJoinNode(String table1, String joinField1, DbIterator sp, Predicate.Op pred) {
-        t1 = table1;
-        f1 = joinField1;
+        t1Alias = table1;
+        String[] tmps = joinField1.split("[.]");
+        if (tmps.length>1)
+            f1PureName = tmps[tmps.length-1];
+        else
+            f1PureName=joinField1;
+        f1QuantifiedName=t1Alias+"."+f1PureName;
         subPlan = sp;
         p = pred;
     }
     
     @Override public int hashCode() {
-        return t1.hashCode() + f1.hashCode() + subPlan.hashCode();
+        return t1Alias.hashCode() + f1PureName.hashCode() + subPlan.hashCode();
     }
     
     @Override public boolean equals(Object o) {
@@ -25,11 +30,11 @@ public class LogicalSubplanJoinNode extends LogicalJoinNode {
         if (!(o instanceof LogicalSubplanJoinNode))
             return false;
         
-        return (j2.t1.equals(t1)  && j2.f1.equals(f1) && ((LogicalSubplanJoinNode)o).subPlan.equals(subPlan));
+        return (j2.t1Alias.equals(t1Alias)  && j2.f1PureName.equals(f1PureName) && ((LogicalSubplanJoinNode)o).subPlan.equals(subPlan));
     }
     
     public LogicalSubplanJoinNode swapInnerOuter() {
-        LogicalSubplanJoinNode j2 = new LogicalSubplanJoinNode(t1,f1,subPlan, p);
+        LogicalSubplanJoinNode j2 = new LogicalSubplanJoinNode(t1Alias,f1PureName,subPlan, p);
         return j2;
     }
 

@@ -1,7 +1,30 @@
 package simpledb;
 
+import java.util.Map;
+import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
+
 /** TableStats represents statistics (e.g., histograms) about base tables in a query */
 public class TableStats {
+
+    private static final ConcurrentHashMap<String, TableStats> statsMap = new ConcurrentHashMap<String, TableStats>();
+
+    static final int IOCOSTPERPAGE = 1000;
+
+    public static TableStats getTableStats(String tablename) {
+        return statsMap.get(tablename);
+    }
+
+    public static void setTableStats(String tablename, TableStats stats) {
+        statsMap.put(tablename, stats);
+    }
+
+    public static void setStatsMap(HashMap<String, TableStats> s) {
+    }
+
+    public static Map<String, TableStats> getStatsMap() {
+        return statsMap;
+    }
     
     /**
      * Number of bins for the histogram.
@@ -54,6 +77,10 @@ public class TableStats {
     public int estimateTableCardinality(double selectivityFactor) {
     	// some code goes here
         return 0;
+    }
+
+    public double avgSelectivity(int field, Predicate.Op op) {
+        return 0.0;
     }
 
     /** 

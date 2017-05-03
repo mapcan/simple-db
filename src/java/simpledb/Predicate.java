@@ -45,6 +45,18 @@ public class Predicate {
         this.operand = operand;
     }
 
+    public int getField() {
+        return field;
+    }
+
+    public Op getOp() {
+        return op;
+    }
+
+    public Field getOperand() {
+        return operand;
+    }
+
     /**
      * Compares the field number of t specified in the constructor to the
      * operand field specified in the constructor using the operator specific

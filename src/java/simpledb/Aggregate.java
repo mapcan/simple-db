@@ -35,6 +35,22 @@ public class Aggregate extends Operator {
         this.aop = aop;
     }
 
+    public int groupField() {
+        return gfield;
+    }
+
+    public String groupFieldName() {
+        return child.getTupleDesc().getFieldName(gfield);
+    }
+
+    public Aggregator.Op aggregateOp() {
+        return aop;
+    }
+
+    public String aggregateFieldName() {
+        return child.getTupleDesc().getFieldName(afield);
+    }
+
     public static String nameOfAggregatorOp(Aggregator.Op aop) {
         switch (aop) {
         case MIN:
@@ -119,5 +135,13 @@ public class Aggregate extends Operator {
 
     public void close() {
         it.close();
+    }
+
+    public DbIterator[] getChildren() {
+        return new DbIterator[]{child};
+    }
+
+    public void setChildren(DbIterator[] children) {
+        this.child = children[0];
     }
 }

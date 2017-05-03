@@ -109,4 +109,25 @@ public class Join extends Operator {
         }
         return next;
     }
+
+    public DbIterator[] getChildren() {
+        return new DbIterator[]{child1, child2};
+    }
+
+    public void setChildren(DbIterator[] children) {
+        this.child1 = children[0];
+        this.child2 = children[1];
+    }
+
+    public String getJoinField1Name() {
+        return child1.getTupleDesc().getFieldName(p.getField1());
+    }
+
+    public String getJoinField2Name() {
+        return child2.getTupleDesc().getFieldName(p.getField2());
+    }
+
+    public JoinPredicate getJoinPredicate() {
+        return p;
+    }
 }
