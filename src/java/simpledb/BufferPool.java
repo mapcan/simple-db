@@ -41,7 +41,7 @@ class Lock {
     public void acquire(TransactionId tid) {
         if (type == LockType.SHARED && !holders.contains(tid)) {
             holders.add(tid);
-        } else if (type == LockType.EXCLUSIVE && holders.size() <= 1 && !holders.contains(tid)) {
+        } else if (type == LockType.EXCLUSIVE && holders.size() == 0 && !holders.contains(tid)) {
             holders.add(tid);
         }
     }
