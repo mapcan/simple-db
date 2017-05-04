@@ -293,7 +293,13 @@ public class BufferPool {
         throws IOException {
         ArrayList<Object> pids = new ArrayList<Object>(lockManager.getTransactionObjects(tid));
         if (commit) {
-            flushPages(tid);
+            for (Object pid : pids) {
+                if (pages.containsKey(pid)) {
+                    Page page = pages.get(pid);
+                    flushPage((PageId)pid);
+                    page.setBeforeImage();
+                }
+            }
         } else {
             for (Object pid : pids) {
                 if (pages.containsKey(pid)) {
@@ -385,9 +391,12 @@ public class BufferPool {
             return;
         }
         Page page = pages.get(pid);
-        if (page.isDirty() == null) {
+        TransactionId dirtier = page.isDirty();
+        if (dirtier == null) {
             return;
         }
+        Database.getLogFile().logWrite(dirtier, page.getBeforeImage(), page);
+        Database.getLogFile().force();
         Database.getCatalog().getDatabaseFile(page.getId().getTableId()).writePage(page);
         page.markDirty(false, null);
     }
