@@ -66,24 +66,6 @@ public class TableStats {
      */
     static final int NUM_HIST_BINS = 100;
 
-    private class FieldStat {
-        private Object hist;
-        private Type type;
-        private int min;
-        private int max;
-
-        public FieldStat(Type type, int min, int max) {
-            this.type = type;
-            this.min = min;
-            this.max = max;
-            if (type == Type.INT_TYPE) {
-                hist = new IntHistogram(NUM_HIST_BINS, min, max);
-            } else {
-                hist = new StringHistogram(NUM_HIST_BINS);
-            }
-        }
-    }
-
     private int tableid;
     private int ioCostPerPage;
     private TupleDesc desc;
