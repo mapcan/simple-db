@@ -34,6 +34,7 @@ public class Insert extends Operator {
     }
 
     public void open() throws DbException, TransactionAbortedException {
+        super.open();
         child.open();
     }
 

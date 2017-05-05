@@ -85,6 +85,7 @@ public class Aggregate extends Operator {
             aggregator.mergeTupleIntoGroup(child.next());
         }
         child.close();
+        super.open();
         it = aggregator.iterator();
         it.open();
     }

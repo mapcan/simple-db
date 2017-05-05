@@ -292,18 +292,13 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid, boolean commit)
         throws IOException {
         ArrayList<Object> pids = new ArrayList<Object>(lockManager.getTransactionObjects(tid));
-        if (commit) {
-            for (Object pid : pids) {
-                if (pages.containsKey(pid)) {
-                    Page page = pages.get(pid);
+        for (Object pid : pids) {
+            if (pages.containsKey(pid)) {
+                Page page = pages.get(pid);
+                if (commit) {
                     flushPage((PageId)pid);
                     page.setBeforeImage();
-                }
-            }
-        } else {
-            for (Object pid : pids) {
-                if (pages.containsKey(pid)) {
-                    Page page = pages.get(pid);
+                } else {
                     if (page.isDirty() != null) {
                         discardPage((PageId)pid);
                     }

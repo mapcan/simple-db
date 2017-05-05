@@ -466,9 +466,31 @@ public class LogFile {
         synchronized (Database.getBufferPool()) {
             synchronized(this) {
                 preAppend();
-                // some code goes here
+                doRollback(tid.getId());
             }
         }
+    }
+
+    private void doRollback(Long tid) throws IOException {
+        if (!tidToFirstLogRecord.containsKey(tid)) {
+            return;
+        }
+        long beginRecordOffset = tidToFirstLogRecord.get(tid);
+        raf.seek(currentOffset - LONG_SIZE);
+        long endRecordOffset = raf.readLong();
+        while (endRecordOffset > beginRecordOffset) {
+            raf.seek(endRecordOffset);
+            int recordType = raf.readInt();
+            long recordTid = raf.readLong();
+            if (recordType == UPDATE_RECORD && recordTid == tid) {
+                Page before = readPageData(raf);
+                Database.getCatalog().getDatabaseFile(before.getId().getTableId()).writePage(before);
+                Database.getBufferPool().discardPage(before.getId());
+            }
+            raf.seek(endRecordOffset - LONG_SIZE);
+            endRecordOffset = raf.readLong();
+        }
+        raf.seek(currentOffset);
     }
 
     /** Shutdown the logging system, writing out whatever state
@@ -493,7 +515,56 @@ public class LogFile {
         synchronized (Database.getBufferPool()) {
             synchronized (this) {
                 recoveryUndecided = false;
-                // some code goes here
+                raf.seek(0);
+                currentOffset = raf.length();
+                long checkpointOffset = raf.readLong();
+                long beginRecordOffset = LONG_SIZE;
+                Set<Long> losers = new HashSet<Long>();
+                if (checkpointOffset != NO_CHECKPOINT_ID) {
+                    beginRecordOffset = checkpointOffset;
+                }
+                while (beginRecordOffset < currentOffset) {
+                    raf.seek(beginRecordOffset);
+                    int recordType = raf.readInt();
+                    long recordTid = raf.readLong();
+                    switch (recordType) {
+                        case BEGIN_RECORD:
+                            tidToFirstLogRecord.put(recordTid, beginRecordOffset);
+                            losers.add(recordTid);
+                            break;
+                        case COMMIT_RECORD:
+                            tidToFirstLogRecord.remove(recordTid);
+                            losers.remove(recordTid);
+                            break;
+                        case ABORT_RECORD:
+                            long pos = raf.getFilePointer();
+                            doRollback(recordTid);
+                            losers.remove(recordTid);
+                            raf.seek(pos);
+                            break;
+                        case UPDATE_RECORD:
+                            Page before = readPageData(raf);
+                            Page after = readPageData(raf);
+                            Database.getCatalog().getDatabaseFile(after.getId().getTableId()).writePage(after);
+                            break;
+                        case CHECKPOINT_RECORD:
+                            int activeTransactionCount = raf.readInt();
+                            for (int i = 0; i < activeTransactionCount; i++) {
+                                long activeTransactionTid = raf.readLong();
+                                long activeTransactionBeginOffset = raf.readLong();
+                                if (!tidToFirstLogRecord.containsKey(activeTransactionTid)) {
+                                    tidToFirstLogRecord.put(activeTransactionTid, activeTransactionBeginOffset);
+                                }
+                                losers.add(activeTransactionTid);
+                            }
+                            break;
+                    }
+                    raf.readLong();
+                    beginRecordOffset = raf.getFilePointer();
+                }
+                for (Long loser : losers) {
+                    doRollback(loser);
+                }
             }
          }
     }
