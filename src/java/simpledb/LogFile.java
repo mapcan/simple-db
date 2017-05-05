@@ -478,6 +478,7 @@ public class LogFile {
         long beginRecordOffset = tidToFirstLogRecord.get(tid);
         raf.seek(currentOffset - LONG_SIZE);
         long endRecordOffset = raf.readLong();
+
         while (endRecordOffset > beginRecordOffset) {
             raf.seek(endRecordOffset);
             int recordType = raf.readInt();
